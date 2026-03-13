@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 struct AdShieldConfig: Decodable {
     let reportEndpoints: [String]
@@ -11,6 +12,30 @@ enum ConfigProvider {
         case invalidURL
         case fetchFailed(Error)
         case decodeFailed(Error)
+        case decryptionFailed
+    }
+
+    private static let aesKeyHex = "a6be11212141a6ba6cd7b9213fc4d84c98db63c2574824d452dcf56ee8cd6e42"
+
+    private static func decrypt(_ base64String: String) throws -> Data {
+        guard let raw = Data(base64Encoded: base64String.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            throw ConfigError.decryptionFailed
+        }
+        guard raw.count > 12 else { throw ConfigError.decryptionFailed }
+
+        let iv = raw.prefix(12)
+        let ciphertextAndTag = raw.suffix(from: 12)
+
+        let keyBytes = stride(from: 0, to: aesKeyHex.count, by: 2).map { i in
+            let start = aesKeyHex.index(aesKeyHex.startIndex, offsetBy: i)
+            let end = aesKeyHex.index(start, offsetBy: 2)
+            return UInt8(aesKeyHex[start..<end], radix: 16)!
+        }
+        let key = SymmetricKey(data: keyBytes)
+
+        let sealedBox = try AES.GCM.SealedBox(combined: iv + ciphertextAndTag)
+        let decrypted = try AES.GCM.open(sealedBox, using: key)
+        return decrypted
     }
 
     @available(iOS 13.0, *)
@@ -23,11 +48,15 @@ enum ConfigProvider {
         request.timeoutInterval = 10
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
-            return try JSONDecoder().decode(AdShieldConfig.self, from: data)
-        } catch let error as DecodingError {
-            throw ConfigError.decodeFailed(error)
+            guard let base64String = String(data: data, encoding: .utf8) else {
+                throw ConfigError.decryptionFailed
+            }
+            let decrypted = try decrypt(base64String)
+            return try JSONDecoder().decode(AdShieldConfig.self, from: decrypted)
         } catch let error as ConfigError {
             throw error
+        } catch let error as DecodingError {
+            throw ConfigError.decodeFailed(error)
         } catch {
             throw ConfigError.fetchFailed(error)
         }
@@ -46,13 +75,17 @@ enum ConfigProvider {
                 completion(.failure(.fetchFailed(error)))
                 return
             }
-            guard let data = data else {
+            guard let data = data,
+                  let base64String = String(data: data, encoding: .utf8) else {
                 completion(.failure(.fetchFailed(NSError(domain: "AdShield", code: -1))))
                 return
             }
             do {
-                let config = try JSONDecoder().decode(AdShieldConfig.self, from: data)
+                let decrypted = try decrypt(base64String)
+                let config = try JSONDecoder().decode(AdShieldConfig.self, from: decrypted)
                 completion(.success(config))
+            } catch let error as ConfigError {
+                completion(.failure(error))
             } catch {
                 completion(.failure(.decodeFailed(error)))
             }
