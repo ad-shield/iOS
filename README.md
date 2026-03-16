@@ -61,6 +61,10 @@ public enum AdShield {
 | `configure(endpoint:)` | Sets the config endpoint. Must be called before `measure()`. |
 | `measure()` | Runs detection and reporting. Safe to call multiple times — skips if within TTL. |
 
+## Data Collection
+
+This SDK collects limited, non-personal data solely for the purpose of ad block detection. Collected data includes: a randomly generated device identifier (UUID), app bundle ID, OS version, locale, SDK version, and URL accessibility results. **No personally identifiable information (PII) is collected.** The SDK does not access contacts, location, photos, or any other sensitive data.
+
 ## License
 
 Proprietary. Copyright Ad-Shield Inc.
