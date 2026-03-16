@@ -9,6 +9,7 @@ public enum AdShield {
 
     private static let lastMeasuredKey = "io.adshield.lastMeasuredAt"
     private static let ttlKey = "io.adshield.ttlMs"
+    private static let defaultTtlMs = 3_600_000 // 1 hour
 
     public static func configure(endpoint: String) {
         self.configEndpoint = endpoint
@@ -28,6 +29,14 @@ public enum AdShield {
             return
         }
 
+        let savedTtl = UserDefaults.standard.integer(forKey: ttlKey)
+        let ttl = savedTtl > 0 ? savedTtl : defaultTtlMs
+        if isTtlActive(ttlMs: ttl) {
+            os_log("TTL active, skipping measurement", log: logger, type: .debug)
+            resetMeasuring()
+            return
+        }
+
         if #available(iOS 13.0, *) {
             Task { await measureAsync(configUrl: configUrl) }
         } else {
@@ -40,11 +49,6 @@ public enum AdShield {
         defer { resetMeasuring() }
         do {
             let config = try await ConfigProvider.fetch(from: configUrl)
-
-            if isTtlActive(ttlMs: config.transmissionIntervalMs) {
-                os_log("TTL active, skipping measurement", log: logger, type: .debug)
-                return
-            }
 
             let deviceId = DeviceIdentifier.id
             let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
@@ -62,6 +66,7 @@ public enum AdShield {
             markMeasured(ttlMs: config.transmissionIntervalMs)
             os_log("Measurement complete, reported to %d endpoints", log: logger, type: .debug, config.reportEndpoints.count)
         } catch {
+            markMeasured(ttlMs: defaultTtlMs)
             os_log("measure failed: %{public}@", log: logger, type: .error, error.localizedDescription)
         }
     }
@@ -79,10 +84,9 @@ public enum AdShield {
 
         guard let config = fetchedConfig else {
             os_log("Config fetch failed", log: logger, type: .error)
+            markMeasured(ttlMs: defaultTtlMs)
             return
         }
-
-        if isTtlActive(ttlMs: config.transmissionIntervalMs) { return }
 
         let deviceId = DeviceIdentifier.id
         let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
