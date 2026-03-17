@@ -7,10 +7,8 @@ public enum AdShield {
     private static var isMeasuring = false
     internal static var configEndpoint: String?
 
-    private static let lastMeasuredKey = "io.adshield.lastMeasuredAt"
-    private static let ttlKey = "io.adshield.ttlMs"
-    private static let defaultTtlMs = 3_600_000 // 1 hour
-    private static let errorTtlMs = 86_400_000 // 24 hours
+    private static let nextAllowedKey = "io.adshield.nextAllowedAt"
+    private static let errorCooldownMs = 86_400_000 // 24 hours
 
     public static func configure(endpoint: String) {
         self.configEndpoint = endpoint
@@ -30,10 +28,8 @@ public enum AdShield {
             return
         }
 
-        let savedTtl = UserDefaults.standard.integer(forKey: ttlKey)
-        let ttl = savedTtl > 0 ? savedTtl : defaultTtlMs
-        if isTtlActive(ttlMs: ttl) {
-            os_log("TTL active, skipping measurement", log: logger, type: .debug)
+        let nextAllowed = UserDefaults.standard.double(forKey: nextAllowedKey)
+        if nextAllowed > 0 && Date().timeIntervalSince1970 < nextAllowed {
             resetMeasuring()
             return
         }
@@ -55,7 +51,7 @@ public enum AdShield {
             let sampled = Double.random(in: 0..<1) < sampleRatio
 
             if !sampled {
-                markMeasured(ttlMs: config.transmissionIntervalMs)
+                scheduleNext(intervalMs: config.transmissionIntervalMs)
                 return
             }
 
@@ -72,9 +68,9 @@ public enum AdShield {
                 transmissionIntervalMs: config.transmissionIntervalMs
             )
 
-            markMeasured(ttlMs: config.transmissionIntervalMs)
+            scheduleNext(intervalMs: config.transmissionIntervalMs)
         } catch {
-            markMeasured(ttlMs: errorTtlMs)
+            scheduleNext(intervalMs: errorCooldownMs)
             os_log("measure failed: %{public}@", log: logger, type: .error, error.localizedDescription)
         }
     }
@@ -92,7 +88,7 @@ public enum AdShield {
 
         guard let config = fetchedConfig else {
             os_log("Config fetch failed", log: logger, type: .error)
-            markMeasured(ttlMs: errorTtlMs)
+            scheduleNext(intervalMs: errorCooldownMs)
             return
         }
 
@@ -100,7 +96,7 @@ public enum AdShield {
         let sampled = Double.random(in: 0..<1) < sampleRatio
 
         if !sampled {
-            markMeasured(ttlMs: config.transmissionIntervalMs)
+            scheduleNext(intervalMs: config.transmissionIntervalMs)
             return
         }
 
@@ -124,19 +120,12 @@ public enum AdShield {
             transmissionIntervalMs: config.transmissionIntervalMs
         )
 
-        markMeasured(ttlMs: config.transmissionIntervalMs)
+        scheduleNext(intervalMs: config.transmissionIntervalMs)
     }
 
-    private static func isTtlActive(ttlMs: Int) -> Bool {
-        let lastMeasured = UserDefaults.standard.double(forKey: lastMeasuredKey)
-        guard lastMeasured > 0 else { return false }
-        let elapsed = Date().timeIntervalSince1970 - lastMeasured
-        return elapsed < Double(ttlMs) / 1000.0
-    }
-
-    private static func markMeasured(ttlMs: Int) {
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastMeasuredKey)
-        UserDefaults.standard.set(ttlMs, forKey: ttlKey)
+    private static func scheduleNext(intervalMs: Int) {
+        let nextAllowed = Date().timeIntervalSince1970 + Double(intervalMs) / 1000.0
+        UserDefaults.standard.set(nextAllowed, forKey: nextAllowedKey)
     }
 
     private static func resetMeasuring() {
