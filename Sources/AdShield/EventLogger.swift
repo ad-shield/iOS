@@ -4,8 +4,8 @@ enum EventLogger {
     static let sdkVersion = "2.0.0"
 
     @available(iOS 13.0, *)
-    static func log(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult]) async {
-        let body = makeBody(deviceId: deviceId, bundleId: bundleId, results: results)
+    static func log(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult], sampleRatio: Double, transmissionIntervalMs: Int) async {
+        let body = makeBody(deviceId: deviceId, bundleId: bundleId, results: results, sampleRatio: sampleRatio, transmissionIntervalMs: transmissionIntervalMs)
         await withTaskGroup(of: Void.self) { group in
             for endpoint in endpoints {
                 group.addTask {
@@ -26,8 +26,8 @@ enum EventLogger {
         _ = try? await URLSession.shared.data(for: request)
     }
 
-    static func logLegacy(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult]) {
-        let body = makeBody(deviceId: deviceId, bundleId: bundleId, results: results)
+    static func logLegacy(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult], sampleRatio: Double, transmissionIntervalMs: Int) {
+        let body = makeBody(deviceId: deviceId, bundleId: bundleId, results: results, sampleRatio: sampleRatio, transmissionIntervalMs: transmissionIntervalMs)
         let group = DispatchGroup()
         for endpoint in endpoints {
             group.enter()
@@ -46,7 +46,7 @@ enum EventLogger {
         URLSession.shared.dataTask(with: request) { _, _, _ in completion() }.resume()
     }
 
-    private static func makeBody(deviceId: String, bundleId: String, results: [ProbeResult]) -> Data {
+    private static func makeBody(deviceId: String, bundleId: String, results: [ProbeResult], sampleRatio: Double, transmissionIntervalMs: Int) -> Data {
         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         let locale = Locale.current.identifier
 
@@ -61,6 +61,8 @@ enum EventLogger {
             "sdkVersion": sdkVersion,
             "osVersion": osVersion,
             "locale": locale,
+            "event_sample_rate": sampleRatio,
+            "transmissionIntervalMs": transmissionIntervalMs,
             "results": resultsArray
         ]
 

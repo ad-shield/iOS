@@ -50,21 +50,28 @@ public enum AdShield {
         do {
             let config = try await ConfigProvider.fetch(from: configUrl)
 
+            let sampleRatio = config.sampleRatio ?? 1.0
+            let sampled = Double.random(in: 0..<1) < sampleRatio
+
             let deviceId = DeviceIdentifier.id
             let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
             let results = await AdBlockDetector.detect(urls: config.adblockDetectionUrls)
 
-            os_log("Probed %d URLs", log: logger, type: .debug, results.count)
+            os_log("Probed %d URLs, sampled: %{public}@", log: logger, type: .debug, results.count, String(describing: sampled))
 
-            await EventLogger.log(
-                endpoints: config.reportEndpoints,
-                deviceId: deviceId,
-                bundleId: bundleId,
-                results: results
-            )
+            if sampled {
+                await EventLogger.log(
+                    endpoints: config.reportEndpoints,
+                    deviceId: deviceId,
+                    bundleId: bundleId,
+                    results: results,
+                    sampleRatio: sampleRatio,
+                    transmissionIntervalMs: config.transmissionIntervalMs
+                )
+                os_log("Measurement complete, reported to %d endpoints", log: logger, type: .debug, config.reportEndpoints.count)
+            }
 
             markMeasured(ttlMs: config.transmissionIntervalMs)
-            os_log("Measurement complete, reported to %d endpoints", log: logger, type: .debug, config.reportEndpoints.count)
         } catch {
             markMeasured(ttlMs: defaultTtlMs)
             os_log("measure failed: %{public}@", log: logger, type: .error, error.localizedDescription)
@@ -88,6 +95,9 @@ public enum AdShield {
             return
         }
 
+        let sampleRatio = config.sampleRatio ?? 1.0
+        let sampled = Double.random(in: 0..<1) < sampleRatio
+
         let deviceId = DeviceIdentifier.id
         let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
 
@@ -99,12 +109,16 @@ public enum AdShield {
         }
         sem2.wait()
 
-        EventLogger.logLegacy(
-            endpoints: config.reportEndpoints,
-            deviceId: deviceId,
-            bundleId: bundleId,
-            results: results
-        )
+        if sampled {
+            EventLogger.logLegacy(
+                endpoints: config.reportEndpoints,
+                deviceId: deviceId,
+                bundleId: bundleId,
+                results: results,
+                sampleRatio: sampleRatio,
+                transmissionIntervalMs: config.transmissionIntervalMs
+            )
+        }
 
         markMeasured(ttlMs: config.transmissionIntervalMs)
     }
