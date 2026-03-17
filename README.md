@@ -24,11 +24,11 @@ Then add `"AdShield"` to your target's dependencies:
 ## Usage
 
 ```swift
-AdShield.configure(endpoint: "https://your-endpoint.example.com/config")
+AdShield.configure(endpoint: "<ENDPOINT>")
 AdShield.measure()
 ```
 
-- `configure()` — Sets the config endpoint URL. Contact Ad-Shield (dev@ad-shield.io) to obtain your endpoint.
+- `configure()` — Sets the config endpoint URL. Contact Ad-Shield to obtain your endpoint.
 - `measure()` — Detects ad blockers and reports results. Runs in the background.
 
 ## License
