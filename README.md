@@ -38,5 +38,3 @@ Copyright (c) 2024-present Ad-Shield Inc. All rights reserved.
 This software is proprietary and confidential. No part of this software may be reproduced, distributed, modified, reverse-engineered, or used in any form without prior written permission from Ad-Shield Inc.
 
 Unauthorized use, copying, or distribution of this software is strictly prohibited and may result in legal action.
-
-For licensing inquiries, contact dev@ad-shield.io.
