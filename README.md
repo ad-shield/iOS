@@ -24,16 +24,15 @@ Then add `"AdShield"` to your target's dependencies:
 ## Usage
 
 ```swift
-AdShield.configure(endpoint: "<ENDPOINT>")
+AdShield.configure(endpoint: "<ENDPOINT>") // Contact Ad-Shield to obtain your endpoint
 AdShield.measure()
 ```
 
-- `configure()` — Sets the config endpoint URL. Contact Ad-Shield to obtain your endpoint.
-- `measure()` — Detects ad blockers and reports results. Runs in the background.
+Contact Ad-Shield to obtain your endpoint URL.
 
 ## License
 
-Copyright (c) 2024-present Ad-Shield Inc. All rights reserved.
+Copyright (c) 2026-present Ad-Shield Inc. All rights reserved.
 
 This software is proprietary and confidential. No part of this software may be reproduced, distributed, modified, reverse-engineered, or used in any form without prior written permission from Ad-Shield Inc.
 
