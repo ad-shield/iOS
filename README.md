@@ -24,7 +24,7 @@ Then add `"AdShield"` to your target's dependencies:
 ## Usage
 
 ```swift
-AdShield.configure(endpoint: "https://...") // Contact Ad-Shield to obtain your endpoint
+AdShield.configure(endpoint: "https://example.ad-shield.io/config") // Contact Ad-Shield to obtain your endpoint
 AdShield.measure()
 ```
 
