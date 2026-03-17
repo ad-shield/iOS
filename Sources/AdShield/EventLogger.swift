@@ -61,7 +61,7 @@ enum EventLogger {
             "sdkVersion": sdkVersion,
             "osVersion": osVersion,
             "locale": locale,
-            "event_sample_rate": sampleRatio,
+            "sampleRatio": sampleRatio,
             "transmissionIntervalMs": transmissionIntervalMs,
             "results": resultsArray
         ]
