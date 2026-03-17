@@ -1,7 +1,7 @@
 import Foundation
 
 enum EventLogger {
-    static let sdkVersion = "2.0.0"
+    static let sdkVersion = "2.0.3"
 
     @available(iOS 13.0, *)
     static func log(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult], sampleRatio: Double, transmissionIntervalMs: Int) async {

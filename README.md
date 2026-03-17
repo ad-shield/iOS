@@ -6,7 +6,7 @@ Add the dependency in your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ad-shield/iOS.git", from: "2.0.2"),
+    .package(url: "https://github.com/ad-shield/iOS.git", from: "2.0.3"),
 ]
 ```
 
