@@ -8,22 +8,33 @@ struct ProbeResult {
 enum AdBlockDetector {
     private static let timeoutInterval: TimeInterval = 5
     private static let maxRetries = 3
+    private static let maxConcurrency = 4
 
     @available(iOS 13.0, *)
     static func detect(urls: [String]) async -> [ProbeResult] {
+        var results: [ProbeResult] = []
         await withTaskGroup(of: ProbeResult.self) { group in
-            for urlString in urls {
+            var index = 0
+            for urlString in urls.prefix(maxConcurrency) {
                 group.addTask {
                     let accessible = await probeWithRetry(urlString)
                     return ProbeResult(url: urlString, accessible: accessible)
                 }
+                index += 1
             }
-            var results: [ProbeResult] = []
             for await result in group {
                 results.append(result)
+                if index < urls.count {
+                    let urlString = urls[index]
+                    group.addTask {
+                        let accessible = await probeWithRetry(urlString)
+                        return ProbeResult(url: urlString, accessible: accessible)
+                    }
+                    index += 1
+                }
             }
-            return results
         }
+        return results
     }
 
     @available(iOS 13.0, *)
@@ -55,17 +66,22 @@ enum AdBlockDetector {
     }
 
     static func detectLegacy(urls: [String], completion: @escaping ([ProbeResult]) -> Void) {
-        let group = DispatchGroup()
         var results: [ProbeResult] = []
         let lock = NSLock()
+        let semaphore = DispatchSemaphore(value: maxConcurrency)
+        let group = DispatchGroup()
 
         for urlString in urls {
             group.enter()
-            probeWithRetryLegacy(urlString, attemptsLeft: maxRetries) { accessible in
-                lock.lock()
-                results.append(ProbeResult(url: urlString, accessible: accessible))
-                lock.unlock()
-                group.leave()
+            DispatchQueue.global(qos: .utility).async {
+                semaphore.wait()
+                probeWithRetryLegacy(urlString, attemptsLeft: maxRetries) { accessible in
+                    lock.lock()
+                    results.append(ProbeResult(url: urlString, accessible: accessible))
+                    lock.unlock()
+                    semaphore.signal()
+                    group.leave()
+                }
             }
         }
 
