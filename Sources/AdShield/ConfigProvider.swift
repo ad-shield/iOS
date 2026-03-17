@@ -5,6 +5,7 @@ struct AdShieldConfig: Decodable {
     let reportEndpoints: [String]
     let adblockDetectionUrls: [String]
     let transmissionIntervalMs: Int
+    let sampleRatio: Double?
 }
 
 enum ConfigProvider {
@@ -26,10 +27,14 @@ enum ConfigProvider {
         let iv = raw.prefix(12)
         let ciphertextAndTag = raw.suffix(from: 12)
 
-        let keyBytes = stride(from: 0, to: aesKeyHex.count, by: 2).map { i in
+        var keyBytes: [UInt8] = []
+        for i in stride(from: 0, to: aesKeyHex.count, by: 2) {
             let start = aesKeyHex.index(aesKeyHex.startIndex, offsetBy: i)
             let end = aesKeyHex.index(start, offsetBy: 2)
-            return UInt8(aesKeyHex[start..<end], radix: 16)!
+            guard let byte = UInt8(aesKeyHex[start..<end], radix: 16) else {
+                throw ConfigError.decryptionFailed
+            }
+            keyBytes.append(byte)
         }
         let key = SymmetricKey(data: keyBytes)
 

@@ -12,25 +12,28 @@ enum AdBlockDetector {
 
     @available(iOS 13.0, *)
     static func detect(urls: [String]) async -> [ProbeResult] {
+        guard !urls.isEmpty else { return [] }
         var results: [ProbeResult] = []
         await withTaskGroup(of: ProbeResult.self) { group in
             var index = 0
-            for urlString in urls.prefix(maxConcurrency) {
+            let initialBatch = min(maxConcurrency, urls.count)
+            for i in 0..<initialBatch {
+                let urlString = urls[i]
                 group.addTask {
                     let accessible = await probeWithRetry(urlString)
                     return ProbeResult(url: urlString, accessible: accessible)
                 }
-                index += 1
             }
+            index = initialBatch
             for await result in group {
                 results.append(result)
                 if index < urls.count {
                     let urlString = urls[index]
+                    index += 1
                     group.addTask {
                         let accessible = await probeWithRetry(urlString)
                         return ProbeResult(url: urlString, accessible: accessible)
                     }
-                    index += 1
                 }
             }
         }
