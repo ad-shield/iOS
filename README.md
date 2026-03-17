@@ -24,11 +24,15 @@ Then add `"AdShield"` to your target's dependencies:
 ## Usage
 
 ```swift
-AdShield.configure(endpoint: "<ENDPOINT>") // Contact Ad-Shield to obtain your endpoint
+AdShield.configure(endpoint: "https://...") // Contact Ad-Shield to obtain your endpoint
 AdShield.measure()
 ```
 
 Contact Ad-Shield to obtain your endpoint URL.
+
+## Sample App
+
+See [iOS-sample](https://github.com/ad-shield/iOS-sample) for a working example.
 
 ## License
 
