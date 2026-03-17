@@ -9,6 +9,7 @@ enum DeviceIdentifier {
         }
         let newId = UUID().uuidString
         UserDefaults.standard.set(newId, forKey: key)
+        UserDefaults.standard.synchronize()
         return newId
     }
 }

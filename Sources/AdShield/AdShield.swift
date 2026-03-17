@@ -126,6 +126,7 @@ public enum AdShield {
     private static func scheduleNext(intervalMs: Int) {
         let nextAllowed = Date().timeIntervalSince1970 + Double(intervalMs) / 1000.0
         UserDefaults.standard.set(nextAllowed, forKey: nextAllowedKey)
+        UserDefaults.standard.synchronize()
     }
 
     private static func resetMeasuring() {
