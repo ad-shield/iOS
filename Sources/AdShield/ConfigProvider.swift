@@ -43,7 +43,6 @@ enum ConfigProvider {
         return decrypted
     }
 
-    @available(iOS 13.0, *)
     static func fetch(from endpoint: String) async throws -> AdShieldConfig {
         guard let url = URL(string: endpoint) else {
             throw ConfigError.invalidURL
@@ -65,35 +64,5 @@ enum ConfigProvider {
         } catch {
             throw ConfigError.fetchFailed(error)
         }
-    }
-
-    static func fetchLegacy(from endpoint: String, completion: @escaping (Result<AdShieldConfig, ConfigError>) -> Void) {
-        guard let url = URL(string: endpoint) else {
-            completion(.failure(.invalidURL))
-            return
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 10
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            if let error = error {
-                completion(.failure(.fetchFailed(error)))
-                return
-            }
-            guard let data = data,
-                  let base64String = String(data: data, encoding: .utf8) else {
-                completion(.failure(.fetchFailed(NSError(domain: "AdShield", code: -1))))
-                return
-            }
-            do {
-                let decrypted = try decrypt(base64String)
-                let config = try JSONDecoder().decode(AdShieldConfig.self, from: decrypted)
-                completion(.success(config))
-            } catch let error as ConfigError {
-                completion(.failure(error))
-            } catch {
-                completion(.failure(.decodeFailed(error)))
-            }
-        }.resume()
     }
 }
