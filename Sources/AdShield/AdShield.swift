@@ -20,7 +20,10 @@ public enum AdShield {
         if !alreadyMeasuring { isMeasuring = true }
         lock.unlock()
 
-        if alreadyMeasuring { return }
+        if alreadyMeasuring {
+            os_log("Skipping: measurement already in progress", log: logger, type: .debug)
+            return
+        }
 
         guard let configUrl = configEndpoint else {
             os_log("AdShield.configure(endpoint:) must be called before measure()", log: logger, type: .error)
@@ -30,18 +33,15 @@ public enum AdShield {
 
         let nextAllowed = UserDefaults.standard.double(forKey: nextAllowedKey)
         if nextAllowed > 0 && Date().timeIntervalSince1970 < nextAllowed {
+            let remainingSec = Int(nextAllowed - Date().timeIntervalSince1970)
+            os_log("Skipping: throttled, next allowed in %d seconds", log: logger, type: .debug, remainingSec)
             resetMeasuring()
             return
         }
 
-        if #available(iOS 13.0, *) {
-            Task { await measureAsync(configUrl: configUrl) }
-        } else {
-            DispatchQueue.global(qos: .utility).async { measureLegacy(configUrl: configUrl) }
-        }
+        Task { await measureAsync(configUrl: configUrl) }
     }
 
-    @available(iOS 13.0, *)
     private static func measureAsync(configUrl: String) async {
         defer { resetMeasuring() }
         do {
@@ -51,6 +51,7 @@ public enum AdShield {
             let sampled = Double.random(in: 0..<1) < sampleRatio
 
             if !sampled {
+                os_log("Skipping transmission: not sampled (sampleRatio=%.3f)", log: logger, type: .debug, sampleRatio)
                 scheduleNext(intervalMs: config.transmissionIntervalMs)
                 return
             }
@@ -58,6 +59,10 @@ public enum AdShield {
             let deviceId = DeviceIdentifier.id
             let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
             let results = await AdBlockDetector.detect(urls: config.adblockDetectionUrls)
+
+            let accessibleCount = results.filter { $0.accessible }.count
+            let blockedCount = results.count - accessibleCount
+            os_log("Detection complete: %d accessible, %d blocked out of %d URLs", log: logger, type: .debug, accessibleCount, blockedCount, results.count)
 
             await EventLogger.log(
                 endpoints: config.reportEndpoints,
@@ -68,59 +73,12 @@ public enum AdShield {
                 transmissionIntervalMs: config.transmissionIntervalMs
             )
 
+            os_log("Event sent successfully to %d endpoint(s)", log: logger, type: .debug, config.reportEndpoints.count)
             scheduleNext(intervalMs: config.transmissionIntervalMs)
         } catch {
             scheduleNext(intervalMs: errorCooldownMs)
             os_log("measure failed: %{public}@", log: logger, type: .error, error.localizedDescription)
         }
-    }
-
-    private static func measureLegacy(configUrl: String) {
-        defer { resetMeasuring() }
-        let semaphore = DispatchSemaphore(value: 0)
-        var fetchedConfig: AdShieldConfig?
-
-        ConfigProvider.fetchLegacy(from: configUrl) { result in
-            if case .success(let config) = result { fetchedConfig = config }
-            semaphore.signal()
-        }
-        semaphore.wait()
-
-        guard let config = fetchedConfig else {
-            os_log("Config fetch failed", log: logger, type: .error)
-            scheduleNext(intervalMs: errorCooldownMs)
-            return
-        }
-
-        let sampleRatio = config.sampleRatio ?? 1.0
-        let sampled = Double.random(in: 0..<1) < sampleRatio
-
-        if !sampled {
-            scheduleNext(intervalMs: config.transmissionIntervalMs)
-            return
-        }
-
-        let deviceId = DeviceIdentifier.id
-        let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
-
-        let sem2 = DispatchSemaphore(value: 0)
-        var results: [ProbeResult] = []
-        AdBlockDetector.detectLegacy(urls: config.adblockDetectionUrls) { r in
-            results = r
-            sem2.signal()
-        }
-        sem2.wait()
-
-        EventLogger.logLegacy(
-            endpoints: config.reportEndpoints,
-            deviceId: deviceId,
-            bundleId: bundleId,
-            results: results,
-            sampleRatio: sampleRatio,
-            transmissionIntervalMs: config.transmissionIntervalMs
-        )
-
-        scheduleNext(intervalMs: config.transmissionIntervalMs)
     }
 
     private static func scheduleNext(intervalMs: Int) {
@@ -133,5 +91,12 @@ public enum AdShield {
         lock.lock()
         isMeasuring = false
         lock.unlock()
+    }
+
+    internal static func _resetForTesting() {
+        lock.lock()
+        isMeasuring = false
+        lock.unlock()
+        UserDefaults.standard.removeObject(forKey: nextAllowedKey)
     }
 }
