@@ -20,7 +20,10 @@ public enum AdShield {
         if !alreadyMeasuring { isMeasuring = true }
         lock.unlock()
 
-        if alreadyMeasuring { return }
+        if alreadyMeasuring {
+            os_log("Skipping: measurement already in progress", log: logger, type: .debug)
+            return
+        }
 
         guard let configUrl = configEndpoint else {
             os_log("AdShield.configure(endpoint:) must be called before measure()", log: logger, type: .error)
@@ -30,6 +33,8 @@ public enum AdShield {
 
         let nextAllowed = UserDefaults.standard.double(forKey: nextAllowedKey)
         if nextAllowed > 0 && Date().timeIntervalSince1970 < nextAllowed {
+            let remainingSec = Int(nextAllowed - Date().timeIntervalSince1970)
+            os_log("Skipping: throttled, next allowed in %d seconds", log: logger, type: .debug, remainingSec)
             resetMeasuring()
             return
         }
@@ -51,6 +56,7 @@ public enum AdShield {
             let sampled = Double.random(in: 0..<1) < sampleRatio
 
             if !sampled {
+                os_log("Skipping transmission: not sampled (sampleRatio=%.3f)", log: logger, type: .debug, sampleRatio)
                 scheduleNext(intervalMs: config.transmissionIntervalMs)
                 return
             }
@@ -58,6 +64,9 @@ public enum AdShield {
             let deviceId = DeviceIdentifier.id
             let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
             let results = await AdBlockDetector.detect(urls: config.adblockDetectionUrls)
+
+            let detectionSummary = results.map { "\($0.url): \($0.accessible ? "accessible" : "blocked")" }.joined(separator: ", ")
+            os_log("Detection results: %{public}@", log: logger, type: .debug, detectionSummary)
 
             await EventLogger.log(
                 endpoints: config.reportEndpoints,
@@ -68,6 +77,7 @@ public enum AdShield {
                 transmissionIntervalMs: config.transmissionIntervalMs
             )
 
+            os_log("Event sent successfully to %d endpoint(s)", log: logger, type: .debug, config.reportEndpoints.count)
             scheduleNext(intervalMs: config.transmissionIntervalMs)
         } catch {
             scheduleNext(intervalMs: errorCooldownMs)
@@ -96,6 +106,7 @@ public enum AdShield {
         let sampled = Double.random(in: 0..<1) < sampleRatio
 
         if !sampled {
+            os_log("Skipping transmission: not sampled (sampleRatio=%.3f)", log: logger, type: .debug, sampleRatio)
             scheduleNext(intervalMs: config.transmissionIntervalMs)
             return
         }
@@ -111,6 +122,9 @@ public enum AdShield {
         }
         sem2.wait()
 
+        let detectionSummary = results.map { "\($0.url): \($0.accessible ? "accessible" : "blocked")" }.joined(separator: ", ")
+        os_log("Detection results: %{public}@", log: logger, type: .debug, detectionSummary)
+
         EventLogger.logLegacy(
             endpoints: config.reportEndpoints,
             deviceId: deviceId,
@@ -120,6 +134,7 @@ public enum AdShield {
             transmissionIntervalMs: config.transmissionIntervalMs
         )
 
+        os_log("Event sent successfully to %d endpoint(s)", log: logger, type: .debug, config.reportEndpoints.count)
         scheduleNext(intervalMs: config.transmissionIntervalMs)
     }
 
