@@ -12,4 +12,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run tests
-        run: swift test
+        run: xcodebuild test -scheme AdShield -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' -skipPackagePluginValidation
