@@ -30,10 +30,6 @@ AdShield.measure()
 
 Contact Ad-Shield to obtain your endpoint URL.
 
-## Sample App
-
-See [iOS-sample](https://github.com/ad-shield/iOS-sample) for a working example.
-
 ## License
 
 Copyright (c) 2026-present Ad-Shield Inc. All rights reserved.
