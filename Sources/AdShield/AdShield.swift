@@ -65,8 +65,9 @@ public enum AdShield {
             let bundleId = Bundle.main.bundleIdentifier ?? "unknown"
             let results = await AdBlockDetector.detect(urls: config.adblockDetectionUrls)
 
-            let detectionSummary = results.map { "\($0.url): \($0.accessible ? "accessible" : "blocked")" }.joined(separator: ", ")
-            os_log("Detection results: %{public}@", log: logger, type: .debug, detectionSummary)
+            let accessibleCount = results.filter { $0.accessible }.count
+            let blockedCount = results.count - accessibleCount
+            os_log("Detection complete: %d accessible, %d blocked out of %d URLs", log: logger, type: .debug, accessibleCount, blockedCount, results.count)
 
             await EventLogger.log(
                 endpoints: config.reportEndpoints,
@@ -122,8 +123,9 @@ public enum AdShield {
         }
         sem2.wait()
 
-        let detectionSummary = results.map { "\($0.url): \($0.accessible ? "accessible" : "blocked")" }.joined(separator: ", ")
-        os_log("Detection results: %{public}@", log: logger, type: .debug, detectionSummary)
+        let accessibleCount = results.filter { $0.accessible }.count
+        let blockedCount = results.count - accessibleCount
+        os_log("Detection complete: %d accessible, %d blocked out of %d URLs", log: logger, type: .debug, accessibleCount, blockedCount, results.count)
 
         EventLogger.logLegacy(
             endpoints: config.reportEndpoints,
@@ -148,5 +150,13 @@ public enum AdShield {
         lock.lock()
         isMeasuring = false
         lock.unlock()
+    }
+
+    @available(iOS 13.0, *)
+    internal static func _resetForTesting() {
+        lock.lock()
+        isMeasuring = false
+        lock.unlock()
+        UserDefaults.standard.removeObject(forKey: nextAllowedKey)
     }
 }

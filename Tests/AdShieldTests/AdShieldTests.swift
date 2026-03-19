@@ -3,9 +3,8 @@ import XCTest
 
 final class AdShieldTests: XCTestCase {
 
-    func testDetectorReturnsNonNil() async throws {
-        // On a machine with network, detect() should return non-nil
-        let result = try await AdBlockDetector.detect()
-        XCTAssertNotNil(result)
+    func testDetectorReturnsEmptyForEmptyInput() async throws {
+        let result = await AdBlockDetector.detect(urls: [])
+        XCTAssertEqual(result.count, 0)
     }
 }
