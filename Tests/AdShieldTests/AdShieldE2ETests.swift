@@ -65,6 +65,7 @@ final class AdShieldE2ETests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "io.adshield.nextAllowedAt")
         UserDefaults.standard.removeObject(forKey: "io.adshield.deviceId")
         AdShield.configEndpoint = nil
+        AdShield.kv = [:]
         if #available(iOS 13.0, *) {
             AdShield._resetForTesting()
         }
@@ -329,6 +330,52 @@ final class AdShieldE2ETests: XCTestCase {
             XCTAssertEqual(results.count, 1)
             XCTAssertEqual(results.first?["url"] as? String, "https://probe1.test/ad.js")
             XCTAssertNotNil(results.first?["accessible"])
+        }
+    }
+
+    func testEventPayloadContainsKV() async throws {
+        let encryptedConfig = try makeConfig(
+            detectionUrls: ["https://probe1.test/ad.js"],
+            reportEndpoints: ["https://report.test/event"]
+        )
+        var reportBody: [String: Any]?
+
+        MockURLProtocol.requestHandler = { request in
+            let url = request.url!
+            if url.absoluteString.contains("config.test") {
+                let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (response, encryptedConfig.data(using: .utf8)!)
+            }
+            if url.host?.contains("report") == true {
+                if let stream = request.httpBodyStream {
+                    stream.open()
+                    var data = Data()
+                    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4096)
+                    while stream.hasBytesAvailable {
+                        let read = stream.read(buffer, maxLength: 4096)
+                        if read > 0 { data.append(buffer, count: read) }
+                    }
+                    buffer.deallocate()
+                    stream.close()
+                    reportBody = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                } else if let body = request.httpBody {
+                    reportBody = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
+                }
+            }
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data())
+        }
+
+        AdShield.configure(endpoint: "https://config.test/config", kv: ["user_type": "new", "segment": "premium"])
+        AdShield.measure()
+        try await Task.sleep(nanoseconds: 3_000_000_000)
+
+        XCTAssertNotNil(reportBody)
+        if let kv = reportBody?["kv"] as? [String: String] {
+            XCTAssertEqual(kv["user_type"], "new")
+            XCTAssertEqual(kv["segment"], "premium")
+        } else {
+            XCTFail("kv should be present in payload")
         }
     }
 }

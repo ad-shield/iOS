@@ -6,12 +6,14 @@ public enum AdShield {
     private static let lock = NSLock()
     private static var isMeasuring = false
     internal static var configEndpoint: String?
+    internal static var kv: [String: String] = [:]
 
     private static let nextAllowedKey = "io.adshield.nextAllowedAt"
     private static let errorCooldownMs = 86_400_000 // 24 hours
 
-    public static func configure(endpoint: String) {
+    public static func configure(endpoint: String, kv: [String: String] = [:]) {
         self.configEndpoint = endpoint
+        self.kv = kv
     }
 
     public static func measure() {
@@ -70,7 +72,8 @@ public enum AdShield {
                 bundleId: bundleId,
                 results: results,
                 sampleRatio: sampleRatio,
-                transmissionIntervalMs: config.transmissionIntervalMs
+                transmissionIntervalMs: config.transmissionIntervalMs,
+                kv: kv
             )
 
             os_log("Event sent successfully to %d endpoint(s)", log: logger, type: .debug, config.reportEndpoints.count)
@@ -98,5 +101,6 @@ public enum AdShield {
         isMeasuring = false
         lock.unlock()
         UserDefaults.standard.removeObject(forKey: nextAllowedKey)
+        kv = [:]
     }
 }
