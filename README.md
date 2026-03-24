@@ -30,6 +30,23 @@ AdShield.measure()
 
 Contact Ad-Shield to obtain your endpoint URL.
 
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `endpoint` | `String` | Yes | Configuration endpoint URL provided by Ad-Shield. |
+| `kv` | `[String: String]` | No | Custom key-value pairs for segmenting report data. Used to break down metrics by custom dimensions (e.g., user type, app section). Defaults to empty. |
+
+#### Example with KV
+
+```swift
+AdShield.configure(
+    endpoint: "https://example.ad-shield.io/config",
+    kv: ["user_type": "new", "segment": "premium"]
+)
+AdShield.measure()
+```
+
 ## License
 
 Copyright (c) 2026-present Ad-Shield Inc. All rights reserved.
