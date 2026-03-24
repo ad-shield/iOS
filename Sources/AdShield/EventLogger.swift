@@ -1,7 +1,7 @@
 import Foundation
 
 enum EventLogger {
-    static let sdkVersion = "0.0.7"
+    static let sdkVersion = "0.0.8"
 
     static func log(endpoints: [String], deviceId: String, bundleId: String, results: [ProbeResult], sampleRatio: Double, transmissionIntervalMs: Int, kv: [String: String]) async {
         let body = makeBody(deviceId: deviceId, bundleId: bundleId, results: results, sampleRatio: sampleRatio, transmissionIntervalMs: transmissionIntervalMs, kv: kv)
